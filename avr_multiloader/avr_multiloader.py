@@ -91,3 +91,36 @@ class avrdude():
                 logger.error(' {}'.format(l))
             return False
         return True
+
+class avr_multiloader():
+    '''Here we give this either one set of parameters and assume all ports are the same, or we 
+        give a list for any of the parameters.
+    '''
+    def __init__(self, partno, programmer_id, baud_rate, port=None,
+                 confpath=None, hexFile=None):
+        self.avrdudePath = None
+        self.avrdudeCommand = 'avrdude'
+        self.avrconf = self.avrconf/Path('avrdude.conf')
+        length = 0
+        for i in [partno, programmer_id, baud_rate, port, hexFile]:
+            if isinstance(i,list):
+                length = len(i) if length < len(i) else length
+        if length is 0 and port is None:
+            self.port = find_serial_device_ports()
+            length = len(self.port)
+            self.partno = list(repeat(partno,length))
+            self.programmer_id = list(repeat(programmer_id,length))
+            self.baud_rate = list(repeat(baud_rate,length))
+
+        self.avr = list(avrdude(self.partno[i],self.programmer_id[i],
+                                self.baud_rate[i],self.port[i],
+                                self.confpath) for i in range(length))
+
+    def testConnection(self, extraFlags=None):
+        for i in self.avr:
+            test = i.testConnection()
+            if test is not True:
+                logger.error('Test failed for iteration {0}, {1} {2} on port '
+                             '{3}'.format(i,self.partno,self.programmer_id,
+                             self.port))
+                
