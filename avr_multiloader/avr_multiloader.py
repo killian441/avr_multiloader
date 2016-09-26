@@ -8,6 +8,7 @@ Inspired by avr_helpers written by Ryan Fobel
 
 import os
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
+import itertools
 import logging
 import platform
 import warnings
@@ -100,7 +101,12 @@ class avr_multiloader():
                  confpath=None, hexFile=None):
         self.avrdudePath = None
         self.avrdudeCommand = 'avrdude'
-        self.avrconf = self.avrconf/Path('avrdude.conf')
+
+        if confpath is None:
+            self.avrconf = Path(os.path.dirname(__file__))
+        else:
+            self.avrconf = Path(confpath).abspath()
+
         length = 0
         for i in [partno, programmer_id, baud_rate, port, hexFile]:
             if isinstance(i,list):
@@ -108,19 +114,18 @@ class avr_multiloader():
         if length is 0 and port is None:
             self.port = find_serial_device_ports()
             length = len(self.port)
-            self.partno = list(repeat(partno,length))
-            self.programmer_id = list(repeat(programmer_id,length))
-            self.baud_rate = list(repeat(baud_rate,length))
+            self.partno = list(itertools.repeat(partno, length))
+            self.programmer_id = list(itertools.repeat(programmer_id, length))
+            self.baud_rate = list(itertools.repeat(baud_rate, length))
 
-        self.avr = list(avrdude(self.partno[i],self.programmer_id[i],
-                                self.baud_rate[i],self.port[i],
-                                self.confpath) for i in range(length))
+        self.avr = list(avrdude(self.partno[i], self.programmer_id[i],
+                                self.baud_rate[i], self.port[i],
+                                self.avrconf) for i in range(length))
 
-    def testConnection(self, extraFlags=None):
-        for i in self.avr:
+    def testConnections(self, extraFlags=None):
+        for count,i in enumerate(self.avr):
             test = i.testConnection()
             if test is not True:
                 logger.error('Test failed for iteration {0}, {1} {2} on port '
-                             '{3}'.format(i,self.partno,self.programmer_id,
-                             self.port))
-                
+                             '{3}'.format(count, self.partno[count],
+                             self.programmer_id[count], self.port[count]))
