@@ -31,7 +31,7 @@ class avrdude():
         self.avrdudeCommand = 'avrdude'
         if port:
             self.port = port
-            logger.info('Connecting to port: {}'.format(self.port))
+            logger.debug('Connecting to port: {}'.format(self.port))
         else:
             try:
                 self.port = find_serial_device_port()
@@ -44,6 +44,7 @@ class avrdude():
             self.avrconf = Path(confpath).abspath()
 
         self.avrconf = self.avrconf/Path('avrdude.conf')
+        self.errorFlag = False
 
     def setAvrdudePath(self, pathToAvrdude):
         """Manually set path for avrdude.
@@ -58,13 +59,14 @@ class avrdude():
 
         cmd.extend(options)
 
-        logger.info('Executing: {}'.format(cmd))
+        logger.debug('Executing: {}'.format(cmd))
 
         proc = Popen(cmd, stdout=PIPE, stderr=STDOUT, stdin=PIPE)
-        outs, errs = proc.communicate()
+        outs = proc.communicate()
         if proc.returncode:
-            logger.error('Error executing command: {}'.format(errs))
-        return outs,errs
+            logger.error('Error executing command: {}'.format(cmd))
+            self.errorFlag = True
+        return outs
 
     def flashFirmware(self, hexFile, extraFlags=None):
         options = ['-c', self.programmer_id, '-b', str(self.baud_rate), 
@@ -73,8 +75,8 @@ class avrdude():
         if extraFlags is not None:
             options.extend(extraFlags)
 
-        outs, errs = self._executeCommand(options)
-        return outs, errs
+        outs = self._executeCommand(options)
+        return outs
 
     def testConnection(self, extraFlags=None):
         options = ['-c', self.programmer_id, '-b', str(self.baud_rate),
@@ -82,5 +84,15 @@ class avrdude():
         if extraFlags is not None:
             options.extend(extraFlags)
 
-        outs,errs = self._executeCommand(options)
-        return outs,errs
+        outs = self._executeCommand(options)
+        for l in outs.splitlines():
+            i = str(l).find('Expected signature for')
+            if i >= 0:
+                logger.error('testConnection failed: {}'.format(str(l[i-1:])))
+                return False
+        if self.errorFlag:
+            logger.error('testConnection failed: ')
+            for l in outs.splitlines():
+                logger.error(' {}'.format(l))
+            return False
+        return True
