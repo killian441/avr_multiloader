@@ -16,18 +16,10 @@ from path import Path
 from serial_device2 import WriteError, ReadError, SerialDevice, \
     SerialDevices, find_serial_device_ports, find_serial_device_port
 
-try:
-    from shutil import which
-except:
-    logger.warning("shutil.which not found, location of avrdude needs to be ",
-                   "set manually ")
-
 logger = logging.getLogger()
-
 
 class FirmwareError(Exception):
     pass
-
 
 class avrdude():
     def __init__(self, partno, programmer_id, baud_rate, port=None, 
@@ -41,8 +33,11 @@ class avrdude():
             self.port = port
             logger.info('Connecting to port: {}'.format(self.port))
         else:
-            #TODO: Discover port...
-            pass
+            try:
+                self.port = find_serial_device_port()
+                logger.info('Connecting to port: {}'.format(self.port))
+            except RuntimeError as err:
+                logger.error('RuntimeError: {}'.format(err))
         if confpath is None:
             self.avrconf = Path(os.path.dirname(__file__))
         else:
@@ -70,7 +65,6 @@ class avrdude():
         if proc.returncode:
             logger.error('Error executing command: {}'.format(errs))
         return outs,errs
-
 
     def flashFirmware(self, hexFile, extraFlags=None):
         options = ['-c', self.programmer_id, '-b', str(self.baud_rate), 
