@@ -62,7 +62,7 @@ class avrdude():
         logger.debug('Executing: {}'.format(cmd))
 
         proc = Popen(cmd, stdout=PIPE, stderr=STDOUT, stdin=PIPE)
-        outs = proc.communicate()
+        outs, errs = proc.communicate()
         if proc.returncode:
             logger.error('Error executing command: {}'.format(cmd))
             self.errorFlag = True
@@ -85,11 +85,6 @@ class avrdude():
             options.extend(extraFlags)
 
         outs = self._executeCommand(options)
-        for l in outs.splitlines():
-            i = str(l).find('Expected signature for')
-            if i >= 0:
-                logger.error('testConnection failed: {}'.format(str(l[i-1:])))
-                return False
         if self.errorFlag:
             logger.error('testConnection failed: ')
             for l in outs.splitlines():
