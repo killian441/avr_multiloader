@@ -7,7 +7,7 @@ Inspired by avr_helpers written by Ryan Fobel
 """
 
 import os
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import logging
 import platform
 import warnings
@@ -60,7 +60,7 @@ class avrdude():
 
         logger.info('Executing: {}'.format(cmd))
 
-        proc = Popen(cmd, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+        proc = Popen(cmd, stdout=PIPE, stderr=STDOUT, stdin=PIPE)
         outs, errs = proc.communicate()
         if proc.returncode:
             logger.error('Error executing command: {}'.format(errs))
