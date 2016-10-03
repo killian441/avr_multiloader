@@ -63,7 +63,11 @@ class avrdude():
         logger.debug('Executing: {}'.format(cmd))
 
         proc = Popen(cmd, stdout=PIPE, stderr=STDOUT, stdin=PIPE)
-        outs, errs = proc.communicate()
+        try:
+            outs, errs = proc.communicate(timeout=15)
+        except TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
         if proc.returncode:
             logger.error('Error executing command: {}'.format(cmd))
             self.errorFlag = True
@@ -153,7 +157,7 @@ class avr_multiloader():
             else:
                 fileToFlash = [hexFile]*len(self.avr)
         else:
-            logger.error("No hexFile specified")
+            logger.error('No hexFile specified')
             return 0
 
         for count,i in enumerate(self.avr):
@@ -168,7 +172,9 @@ class avr_multiloader():
     def testConnections(self, extraFlags=None):
         for count,i in enumerate(self.avr):
             test = i.testConnection(extraFlags)
-            if test is not True:
+            if test is True:
+                print('Test passed for port {0}'.format(i.port))
+            else:
                 logger.error('Test failed for iteration {0}, {1} ({2}) on '
                              'port {3}'.format(count, self.partno[count],
                              self.programmer_id[count], self.port[count]))
