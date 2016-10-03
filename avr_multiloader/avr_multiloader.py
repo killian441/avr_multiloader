@@ -94,8 +94,8 @@ class avrdude():
         return True
 
 class avr_multiloader():
-    '''Here we give this either one set of parameters and assume all ports are the same, or we 
-        give a list for any of the parameters.
+    '''Here we give this either one set of parameters and assume all ports are
+        the same, or we give a list for any of the parameters.
     '''
     def __init__(self, partno, programmer_id, baud_rate, port=None,
                  confpath=None, hexFile=None):
@@ -108,24 +108,67 @@ class avr_multiloader():
             self.avrconf = Path(confpath).abspath()
 
         length = 0
-        for i in [partno, programmer_id, baud_rate, port, hexFile]:
+        for i in [partno, programmer_id, baud_rate, hexFile]:
             if isinstance(i,list):
                 length = len(i) if length < len(i) else length
-        if length is 0 and port is None:
-            self.port = find_serial_device_ports()
-            length = len(self.port)
-            self.partno = list(itertools.repeat(partno, length))
-            self.programmer_id = list(itertools.repeat(programmer_id, length))
-            self.baud_rate = list(itertools.repeat(baud_rate, length))
 
-        self.avr = list(avrdude(self.partno[i], self.programmer_id[i],
-                                self.baud_rate[i], self.port[i],
-                                self.avrconf) for i in range(length))
+        if hexFile is None:
+            self.hexFile = None
+        else:
+            self.hexfile = hexFile if isinstance(hexFile,list) else [hexFile]
+
+        if port is None:
+            self.port = find_serial_device_ports()
+        else:
+            self.port = port if isinstance(port,list) else [port]
+
+        if len(self.port) >= length:
+            length = len(self.port)
+        else:
+            logger.error("More parameters specified than available ports"
+                         " - truncating parameters")
+
+        self.partno = [partno[x] for x in range(
+                        length)] if isinstance(
+                        partno,list) else [partno]*length
+        self.programmer_id = [programmer_id[x] for x in range(
+                        length)] if isinstance(
+                        programmer_id,list) else [programmer_id]*length
+        self.baud_rate = [baud_rate[x] for x in range(
+                        length)] if isinstance(
+                        baud_rate,list) else [baud_rate]*length  
+
+        self.avr = list(avrdude(self.partno[y], self.programmer_id[y],
+                                self.baud_rate[y], self.port[y],
+                                self.avrconf) for y in range(length))
+
+    def flashFirmware(self, hexFile=None, extraFlags=None):
+        self.errorFlag = False
+        if self.hexFile is not None and hexFile is None:
+            fileToFlash = self.hexFile
+        elif hexFile is not None:
+            if isinstance(hexFile,list):
+                fileToFlash = hexFile.extend(itertools.repeat(hexFile[-1],
+                                len(hexFile)-len(self.avr)))
+            else:
+                fileToFlash = [hexFile]*len(self.avr)
+        else:
+            logger.error("No hexFile specified")
+            return 0
+
+        for count,i in enumerate(self.avr):
+            outs = i.flashFirmware(fileToFlash[count], extraFlags)
+            if self.errorFlag:
+                logger.error('flashFirmware failed for iteration {0}, {1}'
+                             ' ({2}) on port {3}'.format(count,
+                              self.partno[count],self.programmer_id[count],
+                              self.port[count]))
+            self.errorFlag = False
 
     def testConnections(self, extraFlags=None):
         for count,i in enumerate(self.avr):
-            test = i.testConnection()
+            test = i.testConnection(extraFlags)
             if test is not True:
-                logger.error('Test failed for iteration {0}, {1} {2} on port '
-                             '{3}'.format(count, self.partno[count],
+                logger.error('Test failed for iteration {0}, {1} ({2}) on '
+                             'port {3}'.format(count, self.partno[count],
                              self.programmer_id[count], self.port[count]))
